@@ -1,6 +1,6 @@
 import { createSteppedFluidEngine, type SteppedFluidEngine } from 'svelte-fluid/experimental';
 import type { FluidConfig, RGB } from 'svelte-fluid';
-import { READBACK_LAG, type AirLayer, type Level, type LiquidTick, type Vec } from './types.js';
+import { READBACK_LAG, type AirLayer, type Level, type LiquidTick, type CellVec } from './types.js';
 
 const WIDTH = 192,
 	HEIGHT = 120;
@@ -27,7 +27,7 @@ type EngineFactory = (options: {
 	config: FluidConfig;
 	autoStart: false;
 }) => AirEngine;
-const normalized = (p: Vec) => ({ x: p.x / 48, y: 1 - p.y / 30 });
+const normalized = (p: CellVec) => ({ x: p.x / 48, y: 1 - p.y / 30 });
 
 export function createAirLayer(
 	canvas: HTMLCanvasElement,
@@ -35,7 +35,7 @@ export function createAirLayer(
 	makeEngine: EngineFactory = (options) => createSteppedFluidEngine(options)
 ): AirLayer {
 	const initialVents = Object.fromEntries(level.vents.map(v => [v.id, v.control?.kind === 'turn' ? v.control.velocities[v.control.index] : v.control?.kind === 'switch' && !v.control.on ? { x: 0, y: 0 } : v.velocity]));
-	const sources = (velocities: Readonly<Record<string, Vec>>) => level.vents.map(vent => ({
+	const sources = (velocities: Readonly<Record<string, CellVec>>) => level.vents.map(vent => ({
 		kind: 'line' as const,
 		from: normalized(vent.from),
 		to: normalized(vent.to),

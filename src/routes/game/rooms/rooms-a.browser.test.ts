@@ -1,3 +1,4 @@
+const BENCH = import.meta.env.VERDIGRIS_BENCH_DIR;
 import { expect, it } from 'vitest';
 import { commands, page } from 'vitest/browser';
 import { mount, tick, unmount } from 'svelte';
@@ -27,7 +28,7 @@ const output = commands as unknown as {
 const rooms = [hiddenDraft, stillPond];
 const selected = import.meta.env.VITE_ROOMS_A_ROOM ?? 'hidden-draft';
 const mode = import.meta.env.VITE_ROOMS_A_RUN;
-const OUT = `/tmp/verdigris-v3/rooms/${selected}`;
+const OUT = `${BENCH}/v3/rooms/${selected}`;
 const cap = 1500;
 const results: { name: string; outcome: Outcome }[] = [];
 async function run(

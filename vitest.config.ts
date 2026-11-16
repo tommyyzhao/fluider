@@ -1,9 +1,14 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
-import { dirname } from 'node:path';
+import { tmpdir } from 'node:os';
+import { dirname, join, resolve, sep } from 'node:path';
 import { sveltekit } from '@sveltejs/kit/vite';
 import { defineConfig, defineProject } from 'vitest/config';
 import { playwright } from '@vitest/browser-playwright';
 import { studyBuildHash } from './scripts/study-build-hash.mjs';
+
+// Bench evidence (screenshots, solver checkpoints, timing JSON) goes under one root.
+// Override with VERDIGRIS_BENCH_DIR; the default lives in the OS temp directory.
+const benchDir = resolve(process.env.VERDIGRIS_BENCH_DIR ?? join(tmpdir(), 'verdigris-bench'));
 
 const browserProject = defineProject({
 	extends: true,
@@ -44,11 +49,12 @@ const browserProject = defineProject({
 					await ctx.page.emulateMedia(media);
 				},
 				// Built-in writeFile is confined to the project root; the GPU bench
-				// writes its JSON to an arbitrary path (default /tmp).
-				async readSolverCheckpoint(_ctx: unknown, name: string, dir = '/tmp/verdigris-v3/solver') {
+				// writes its JSON to an arbitrary path (under benchDir by default).
+				async readSolverCheckpoint(_ctx: unknown, name: string, dir = join(benchDir, 'v3', 'solver')) {
+					const target = resolve(dir);
 					if (!/^[a-z0-9-]+$/.test(name)) throw new Error('Invalid solver checkpoint name');
-					if (!/^\/tmp\/verdigris-v3\/[a-z0-9/-]+$/.test(dir)) throw new Error('Invalid solver checkpoint directory');
-					try { return await readFile(`${dir}/${name}.json`, 'utf8'); }
+					if (target !== benchDir && !target.startsWith(benchDir + sep)) throw new Error('Invalid solver checkpoint directory');
+					try { return await readFile(`${target}/${name}.json`, 'utf8'); }
 					catch (error) { if ((error as NodeJS.ErrnoException).code === 'ENOENT') return '[]'; throw error; }
 				},
 				async writeBenchJson(_ctx: unknown, path: string, content: string) {
@@ -87,7 +93,10 @@ const nodeProject = defineProject({
 });
 
 export default defineConfig({
-	define: { 'import.meta.env.VITE_STUDY_BUILD_HASH': JSON.stringify(studyBuildHash(new URL('.', import.meta.url))) },
+	define: {
+		'import.meta.env.VITE_STUDY_BUILD_HASH': JSON.stringify(studyBuildHash(new URL('.', import.meta.url))),
+		'import.meta.env.VERDIGRIS_BENCH_DIR': JSON.stringify(benchDir)
+	},
 	cacheDir: '.svelte-kit/vitest-cache',
 	plugins: [sveltekit()],
 	test: {

@@ -1,3 +1,4 @@
+const BENCH = import.meta.env.VERDIGRIS_BENCH_DIR;
 import { describe, expect, it } from 'vitest';
 import { commands } from 'vitest/browser';
 import { LiquidEngine } from 'svelte-fluid/experimental';
@@ -12,7 +13,7 @@ const output = commands as unknown as {
 	writeBenchJson(path: string, json: string): Promise<void>;
 	writeBenchBase64(path: string, base64: string): Promise<void>;
 };
-const OUT = '/tmp/verdigris-v3/v3-verbs/solutions';
+const OUT = `${BENCH}/v3/v3-verbs/solutions`;
 const yieldGpu = () => new Promise<void>((resolve) => setTimeout(resolve, 0));
 type Mode =
 	| 'solution'

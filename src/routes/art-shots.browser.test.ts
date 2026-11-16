@@ -1,3 +1,4 @@
+const BENCH = import.meta.env.VERDIGRIS_BENCH_DIR;
 import { afterEach, expect, it } from 'vitest';
 import { mount, tick, unmount } from 'svelte';
 import { commands, page } from 'vitest/browser';
@@ -33,7 +34,7 @@ async function setup(width = 1440, height = 900) {
 async function shot(name: string) {
 	await tick();
 	await browser.writeBenchBase64(
-		`/tmp/verdigris-ui/art-${name}.png`,
+		`${BENCH}/ui/art-${name}.png`,
 		await browser.captureCanvasScreenshot({
 			x: 0,
 			y: 0,

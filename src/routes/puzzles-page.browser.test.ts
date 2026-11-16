@@ -1,3 +1,4 @@
+const BENCH = import.meta.env.VERDIGRIS_BENCH_DIR;
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { mount, tick, unmount } from 'svelte';
 import { commands, page, userEvent } from 'vitest/browser';
@@ -346,7 +347,7 @@ function pointer() {
 			})
 		);
 }
-async function shot(name: string, path = `/tmp/verdigris-v3/v3-verbs/ui/${name}.png`) {
+async function shot(name: string, path = `${BENCH}/v3/v3-verbs/ui/${name}.png`) {
 	const browser = commands as unknown as {
 		captureCanvasScreenshot(rect: {
 			x: number;
@@ -913,7 +914,7 @@ describe('Verdigris contextual gestures', () => {
 			if (i) expect(pane.textContent).toContain(`Clear ${REAL_LEVELS[i - 1].name} to wake`);
 			expect(pane.getBoundingClientRect().height).toBeGreaterThanOrEqual(44);
 		}
-		await shot('map-six-rooms', '/tmp/verdigris-v3/fixes/map-six-rooms.png');
+		await shot('map-six-rooms', `${BENCH}/v3/fixes/map-six-rooms.png`);
 		await unmount(app!); app = undefined;
 		const onselect = vi.fn();
 		app = mount(Map, { target: target!, props: { levels: REAL_LEVELS, progress: { version: 2, cleared: {}, finale: false }, available: REAL_LEVELS.length, onselect, onback: () => {} } });

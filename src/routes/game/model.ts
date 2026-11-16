@@ -1,13 +1,7 @@
 import {
-	AIR,
-	GATE,
-	INK,
-	LOAM,
-	ROOT,
-	STONE,
-	VINE,
+	Cell,
 	type CellKind,
-	type Rect,
+	type CellRect,
 	type TerrainEdit
 } from 'svelte-fluid/experimental';
 import {
@@ -22,7 +16,7 @@ import {
 	TICK_HZ,
 	type Action,
 	type Box,
-	type Counts,
+	type SpeciesCounts,
 	type GameEvent,
 	type Level,
 	type LiquidScene,
@@ -32,7 +26,8 @@ import {
 	type SensorFrame,
 	type UrnStatus,
 	type UrnView,
-	type Vec
+	type CellVec,
+	Tag
 } from './types.js';
 import { levelHeight } from './level-height.js';
 
@@ -40,15 +35,15 @@ const W = LEVEL_W * SCALE;
 const H = LEVEL_H * SCALE;
 const GATE_TICKS = Math.round(0.6 * TICK_HZ);
 const clamp = (n: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, n));
-const finitePoint = (p: Vec) => Number.isFinite(p.x) && Number.isFinite(p.y);
-const total = (counts: Counts) => counts[0] + counts[1] + counts[2];
-const cleanCounts = (counts?: Counts): Counts =>
+const finitePoint = (p: CellVec) => Number.isFinite(p.x) && Number.isFinite(p.y);
+const total = (counts: SpeciesCounts) => counts[0] + counts[1] + counts[2];
+const cleanCounts = (counts?: SpeciesCounts): SpeciesCounts =>
 	[0, 1, 2].map((i) => {
 		const n = counts?.[i];
 		return typeof n === 'number' && Number.isFinite(n) ? Math.max(0, n) : 0;
-	}) as unknown as Counts;
+	}) as unknown as SpeciesCounts;
 
-function rect(box: Box): Rect {
+function rect(box: Box): CellRect {
 	const x = Math.round(box.x * SCALE);
 	const y = Math.round(box.y * SCALE);
 	return {
@@ -68,7 +63,7 @@ function boxCells(box: Box): Set<number> {
 	return cells;
 }
 
-function lineCells(from: Vec, to: Vec, thickness: number): Set<number> {
+function lineCells(from: CellVec, to: CellVec, thickness: number): Set<number> {
 	const ax = from.x * SCALE;
 	const ay = from.y * SCALE;
 	const dx = (to.x - from.x) * SCALE;
@@ -91,7 +86,7 @@ function lineCells(from: Vec, to: Vec, thickness: number): Set<number> {
 	return cells;
 }
 
-function tip(pivot: Vec, length: number, angle: number): Vec {
+function tip(pivot: CellVec, length: number, angle: number): CellVec {
 	const a = (angle * Math.PI) / 180;
 	return {
 		x: pivot.x + length * Math.cos(a),
@@ -100,7 +95,7 @@ function tip(pivot: Vec, length: number, angle: number): Vec {
 }
 
 interface RecipeState {
-	counts: Counts;
+	counts: SpeciesCounts;
 	units: number;
 	status: UrnStatus;
 	holdTicks: number;
@@ -136,7 +131,7 @@ export function createRoom(source: Level, options: { sandbox?: boolean } = {}): 
 	let cleared = false;
 	let holdTicks = 0;
 	let allReady = false;
-	let pouring: { spring: string; at: Vec } | null = null;
+	let pouring: { spring: string; at: CellVec } | null = null;
 	let supplyDenied = false;
 	let stuck = false;
 	let drops = 0;
@@ -167,10 +162,10 @@ export function createRoom(source: Level, options: { sandbox?: boolean } = {}): 
 	const edits = new Map<number, CellKind>();
 	const base = new Uint8Array(W * H);
 	const kinds: Record<string, CellKind> = {
-		' ': AIR,
-		'#': STONE,
-		'%': LOAM,
-		'&': ROOT
+		' ': Cell.Air,
+		'#': Cell.Solid,
+		'%': Tag.Loam,
+		'&': Tag.Root
 	};
 	for (let y = 0; y < H; y++) {
 		for (let x = 0; x < W; x++)
@@ -183,7 +178,7 @@ export function createRoom(source: Level, options: { sandbox?: boolean } = {}): 
 	const fractions = Object.fromEntries(level.springs.map((s) => [s.id, 0]));
 	const scheduled = [0, 0, 0];
 	const ventControls = Object.fromEntries(level.vents.flatMap(v => v.control ? [[v.id, v.control.kind === 'switch' ? Number(v.control.on) : v.control.index]] : []));
-	const ventVelocity = (v: Level['vents'][number]): Vec => v.control?.kind === 'turn' ? v.control.velocities[ventControls[v.id]] : v.control && !ventControls[v.id] ? { x: 0, y: 0 } : v.velocity;
+	const ventVelocity = (v: Level['vents'][number]): CellVec => v.control?.kind === 'turn' ? v.control.velocities[ventControls[v.id]] : v.control && !ventControls[v.id] ? { x: 0, y: 0 } : v.velocity;
 	const gauges = Object.fromEntries((level.gauges ?? []).map(g => [g.id, { units: 0, surface: g.box.y + g.box.h }]));
 	const planks = Object.fromEntries(level.planks.map((p) => [p.id, p.initial]));
 	const gates = Object.fromEntries(
@@ -258,10 +253,10 @@ export function createRoom(source: Level, options: { sandbox?: boolean } = {}): 
 	for (const b of level.brambles)
 		vineCells.set(`bramble:${b.id}`, new Set(brambleRows.get(b.id)!.flatMap((r) => [...r])));
 	function kindAt(i: number): CellKind {
-		if ([...vineCells.values()].some((cells) => cells.has(i))) return VINE;
-		if ([...plankCells.values()].some((cells) => cells.has(i))) return STONE;
-		if ([...gateCells.values()].some((cells) => cells.has(i))) return GATE;
-		return inkCells.has(i) ? INK : (base[i] as CellKind);
+		if ([...vineCells.values()].some((cells) => cells.has(i))) return Tag.Vine;
+		if ([...plankCells.values()].some((cells) => cells.has(i))) return Cell.Solid;
+		if ([...gateCells.values()].some((cells) => cells.has(i))) return Tag.Gate;
+		return inkCells.has(i) ? Tag.Ink : (base[i] as CellKind);
 	}
 	for (const group of [gateCells, plankCells, vineCells]) {
 		for (const cells of group.values()) for (const i of cells) terrain[i] = kindAt(i);
@@ -343,7 +338,7 @@ export function createRoom(source: Level, options: { sandbox?: boolean } = {}): 
 	function recipe(
 		s: RecipeState,
 		target: Recipe,
-		counts: Counts,
+		counts: SpeciesCounts,
 		elapsed: number,
 		seed = false
 	): void {
@@ -390,7 +385,7 @@ export function createRoom(source: Level, options: { sandbox?: boolean } = {}): 
 	}
 	function act(action: Action): GameEvent[] {
 		const events: GameEvent[] = [];
-		const denied = (reason: Extract<GameEvent, { type: 'denied' }>['reason'], at?: Vec) =>
+		const denied = (reason: Extract<GameEvent, { type: 'denied' }>['reason'], at?: CellVec) =>
 			events.push({ type: 'denied', reason, ...(at ? { at: { ...at } } : {}) });
 		if (action.type === 'stir') return events;
 		if (action.type === 'puff') {
@@ -495,7 +490,7 @@ export function createRoom(source: Level, options: { sandbox?: boolean } = {}): 
 				(a, b) => along(a) - along(b)
 			);
 			for (const i of candidates) {
-				if (terrain[i] !== AIR || protectedCells.has(i)) continue;
+				if (terrain[i] !== Cell.Air || protectedCells.has(i)) continue;
 				if (occupancy[i]) {
 					if (!wetDenied.has(action.stroke)) {
 						denied('wet', {
@@ -537,10 +532,10 @@ export function createRoom(source: Level, options: { sandbox?: boolean } = {}): 
 			const changed: number[] = [];
 			let hard = false;
 			for (const i of lineCells(action.at, action.at, action.radius * SCALE * 2)) {
-				if (terrain[i] === LOAM) {
-					base[i] = AIR;
+				if (terrain[i] === Tag.Loam) {
+					base[i] = Cell.Air;
 					changed.push(i);
-				} else if (terrain[i] === ROOT || terrain[i] === STONE) hard = true;
+				} else if (terrain[i] === Tag.Root || terrain[i] === Cell.Solid) hard = true;
 			}
 			if (!changed.length && hard) denied('not-diggable', action.at);
 			refresh(changed);
@@ -582,8 +577,8 @@ export function createRoom(source: Level, options: { sandbox?: boolean } = {}): 
 		const emit = [] as {
 			species: 0 | 1 | 2;
 			count: number;
-			rect: Rect;
-			velocity: Vec;
+			rect: CellRect;
+			velocity: CellVec;
 		}[];
 		if (pouring) {
 			const spring = level.springs.find((s) => s.id === pouring!.spring)!;
@@ -776,7 +771,7 @@ export function createRoom(source: Level, options: { sandbox?: boolean } = {}): 
 	function recipeView(id: string, amount: number, s: RecipeState): UrnView {
 		return {
 			id,
-			counts: [...s.counts] as unknown as Counts,
+			counts: [...s.counts] as unknown as SpeciesCounts,
 			units: s.units,
 			status: s.status,
 			hold: clamp(s.holdTicks / (HOLD_SECONDS * TICK_HZ), 0, 1),

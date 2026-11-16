@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { AIR, GATE, INK, LOAM, ROOT, STONE, VINE } from 'svelte-fluid/experimental';
+import { Cell } from 'svelte-fluid/experimental';
 import { createRoom } from './model.js';
 import { LEVELS } from './levels.js';
 import {
@@ -7,7 +7,8 @@ import {
 	MARKERS_PER_UNIT,
 	SCALE,
 	TICK_HZ,
-	type Counts,
+	Tag,
+	type SpeciesCounts,
 	type Level,
 	type RoomModel,
 	type SensorFrame
@@ -72,7 +73,7 @@ function fixture(patch: Partial<Level> = {}): Level {
 }
 function frame(
 	tick: number,
-	units: Record<string, Counts> = {},
+	units: Record<string, SpeciesCounts> = {},
 	patch: Partial<SensorFrame> = {}
 ): SensorFrame {
 	return {
@@ -82,7 +83,7 @@ function frame(
 			Object.entries(units).map(([id, counts]) => [
 				id,
 				{
-					counts: counts.map((n) => Math.round(n * MARKERS_PER_UNIT)) as unknown as Counts,
+					counts: counts.map((n) => Math.round(n * MARKERS_PER_UNIT)) as unknown as SpeciesCounts,
 					flux: { x: 0, y: 0 }
 				}
 			])
@@ -198,7 +199,7 @@ function advance(room: RoomModel, n: number) {
 	return Array.from({ length: n }, () => room.planTick());
 }
 const holdTicks = HOLD_SECONDS * TICK_HZ;
-function sample(room: RoomModel, from: number, to: number, units: Record<string, Counts>) {
+function sample(room: RoomModel, from: number, to: number, units: Record<string, SpeciesCounts>) {
 	return Array.from({ length: to - from + 1 }, (_, i) =>
 		room.observe(frame(from + i, units))
 	).flat();
@@ -247,11 +248,11 @@ describe('scene and deterministic boundary', () => {
 		);
 		const scene = room.scene();
 		expect([scene.width, scene.height]).toEqual([W, H]);
-		expect(scene.terrain[cell(2, 20)]).toBe(STONE);
-		expect(scene.terrain[cell(4, 20)]).toBe(LOAM);
-		expect(scene.terrain[cell(6, 20)]).toBe(ROOT);
-		expect(scene.terrain[cell(30, 20)]).toBe(GATE);
-		expect(scene.terrain[cell(31, 15)]).toBe(VINE);
+		expect(scene.terrain[cell(2, 20)]).toBe(Cell.Solid);
+		expect(scene.terrain[cell(4, 20)]).toBe(Tag.Loam);
+		expect(scene.terrain[cell(6, 20)]).toBe(Tag.Root);
+		expect(scene.terrain[cell(30, 20)]).toBe(Tag.Gate);
+		expect(scene.terrain[cell(31, 15)]).toBe(Tag.Vine);
 		expect(scene.fills).toEqual([{ species: 1, rect: box(12, 20, 8, 12), markers: 128 }]);
 		expect(scene.sensors.map((s) => s.id)).toEqual([
 			'urn:urn',
@@ -277,8 +278,8 @@ describe('scene and deterministic boundary', () => {
 		room.act({ type: 'pour', spring: null });
 		expect(room.view().springs.dew).toBe(100 - 7 / MARKERS_PER_UNIT);
 		expect(room.view().pouring).toBeNull();
-		expect(room.scene().terrain[cell(2, 20)]).toBe(STONE);
-		expect(room.view().terrain[cell(2, 20)]).toBe(STONE);
+		expect(room.scene().terrain[cell(2, 20)]).toBe(Cell.Solid);
+		expect(room.view().terrain[cell(2, 20)]).toBe(Cell.Solid);
 	});
 });
 
@@ -424,9 +425,9 @@ describe('pouring and poses', () => {
 		);
 		room.act({ type: 'pose', id: 'plank', index: 1 });
 		const tick = room.planTick();
-		expect(tick.edits.some((e) => e.kind === AIR)).toBe(true);
-		expect(tick.edits.some((e) => e.kind === STONE)).toBe(true);
-		expect(room.view().terrain[cell(2.25, 20.5)]).toBe(STONE);
+		expect(tick.edits.some((e) => e.kind === Cell.Air)).toBe(true);
+		expect(tick.edits.some((e) => e.kind === Cell.Solid)).toBe(true);
+		expect(room.view().terrain[cell(2.25, 20.5)]).toBe(Cell.Solid);
 		expect(room.act({ type: 'pose', id: 'plank', index: 99 })).toEqual([
 			{ type: 'denied', reason: 'busy' }
 		]);
@@ -456,14 +457,14 @@ describe('gates', () => {
 			]);
 			const ticks = advance(room, 18);
 			expect(room.view().gates.gate).toBe(0.5);
-			expect(ticks.flatMap((t) => t.edits).filter((e) => e.kind === AIR)).toHaveLength(128);
+			expect(ticks.flatMap((t) => t.edits).filter((e) => e.kind === Cell.Air)).toHaveLength(128);
 			room.act({ type: 'toggle', id: 'gate' });
 			advance(room, 18);
 			expect(room.view().gates.gate).toBe(0);
 			room.act({ type: 'toggle', id: 'gate' });
 			advance(room, 36);
 			expect(room.view().gates.gate).toBe(1);
-			expect(room.view().terrain[cell(11, 16)]).toBe(AIR);
+			expect(room.view().terrain[cell(11, 16)]).toBe(Cell.Air);
 		}
 	);
 	it('weight driver uses 10% hysteresis, disallows manual toggle', () => {
@@ -542,7 +543,7 @@ describe('gates', () => {
 });
 
 describe('ink and digging', () => {
-	it('claims dry air, queues INK, stops at budget, refunds complete strokes', () => {
+	it('claims dry air, queues ink, stops at budget, refunds complete strokes', () => {
 		const room = createRoom(fixture({ ink: 5 }));
 		const events = room.act({
 			type: 'ink',
@@ -552,10 +553,10 @@ describe('ink and digging', () => {
 		});
 		expect(events).toContainEqual({ type: 'denied', reason: 'ink-empty' });
 		expect(room.view().inkUsed).toBe(5);
-		expect(room.planTick().edits.filter((e) => e.kind === INK)).toHaveLength(5);
+		expect(room.planTick().edits.filter((e) => e.kind === Tag.Ink)).toHaveLength(5);
 		room.act({ type: 'erase', stroke: 1 });
 		expect(room.view().inkLeft).toBe(5);
-		expect(room.planTick().edits.filter((e) => e.kind === AIR)).toHaveLength(5);
+		expect(room.planTick().edits.filter((e) => e.kind === Cell.Air)).toHaveLength(5);
 	});
 	it('spends scarce ink from the stroke start in either direction', () => {
 		const room = createRoom(fixture({ ink: 4 }));
@@ -616,18 +617,18 @@ describe('ink and digging', () => {
 	it('digs only loam, leaves stone and root, disabled tool does nothing', () => {
 		const room = createRoom(fixture());
 		room.act({ type: 'dig', at: { x: 4.5, y: 20.5 }, radius: 0.75 });
-		expect(room.view().terrain[cell(4.5, 20.5)]).toBe(AIR);
-		expect(room.planTick().edits.every((e) => e.kind === AIR)).toBe(true);
+		expect(room.view().terrain[cell(4.5, 20.5)]).toBe(Cell.Air);
+		expect(room.planTick().edits.every((e) => e.kind === Cell.Air)).toBe(true);
 		for (const x of [2.5, 6.5])
 			expect(room.act({ type: 'dig', at: { x, y: 20.5 }, radius: 0.3 })).toContainEqual({
 				type: 'denied',
 				reason: 'not-diggable',
 				at: { x, y: 20.5 }
 			});
-		expect(room.view().terrain[cell(6.5, 20.5)]).toBe(ROOT);
+		expect(room.view().terrain[cell(6.5, 20.5)]).toBe(Tag.Root);
 		const disabled = createRoom(fixture({ dig: false }));
 		disabled.act({ type: 'dig', at: { x: 4.5, y: 20.5 }, radius: 1 });
-		expect(disabled.view().terrain[cell(4.5, 20.5)]).toBe(LOAM);
+		expect(disabled.view().terrain[cell(4.5, 20.5)]).toBe(Tag.Loam);
 	});
 });
 
@@ -918,7 +919,7 @@ describe('recipes and completion', () => {
 			}
 		];
 		const room = createRoom(level);
-		const both: Record<string, Counts> = {
+		const both: Record<string, SpeciesCounts> = {
 			'urn:urn': [10, 0, 0],
 			'urn:second': [0, 2, 0]
 		};
@@ -1029,7 +1030,7 @@ describe('living geometry', () => {
 			status: 'growing'
 		});
 		expect(advance(room, 2).flatMap((t) => t.edits)).toEqual([]);
-		expect(room.planTick().edits.filter((e) => e.kind === VINE)).toHaveLength(8);
+		expect(room.planTick().edits.filter((e) => e.kind === Tag.Vine)).toHaveLength(8);
 		expect(room.view().seeds.seed).toBe(0.25);
 		advance(room, 9);
 		expect(room.view().seeds.seed).toBe(1);
@@ -1084,8 +1085,8 @@ describe('living geometry', () => {
 		room.observe(frame(77, { 'bramble:thorn': [0, 0, 2] }));
 		advance(room, 12);
 		expect(room.view().brambles.thorn).toBe(0);
-		expect(room.view().terrain[cell(10.5, 15.25)]).toBe(VINE);
-		expect(room.view().terrain[cell(14.5, 16.25)]).toBe(AIR);
+		expect(room.view().terrain[cell(10.5, 15.25)]).toBe(Tag.Vine);
+		expect(room.view().terrain[cell(14.5, 16.25)]).toBe(Cell.Air);
 		expect(room.observe(frame(78))).toContainEqual({
 			type: 'bramble',
 			id: 'thorn'

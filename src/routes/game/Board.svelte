@@ -6,8 +6,8 @@
 	import SpringArt from './SpringArt.svelte';
 	import { FORBIDDEN_TOLERANCE, RATIO_TOLERANCE, HOLD_SECONDS } from './types.js';
 	import { levelHeight } from './level-height.js';
-	import type { Action, Level, Recipe, RoomView, UiSound, UrnView, Vec, Vent } from './types.js';
-	let { telemetry, level, view, oncanvas, onact, onui, payoff = false, denied, resetToken = 0, suspended = false, onboarding, waxCue = false, onlearn }: { telemetry?: Telemetry; level: Level; view: RoomView | null; oncanvas: (canvas: HTMLCanvasElement, airCanvas: HTMLCanvasElement) => void; onact: (action: Action) => void; onui: (sound: UiSound, pan?: number) => void; payoff?: boolean; denied?: { at?: Vec; key: number }; resetToken?: number; suspended?: boolean; onboarding?: 'pour' | 'puff'; waxCue?: boolean; onlearn?: () => void } = $props();
+	import type { Action, Level, Recipe, RoomView, UiSound, UrnView, CellVec, Vent } from './types.js';
+	let { telemetry, level, view, oncanvas, onact, onui, payoff = false, denied, resetToken = 0, suspended = false, onboarding, waxCue = false, onlearn }: { telemetry?: Telemetry; level: Level; view: RoomView | null; oncanvas: (canvas: HTMLCanvasElement, airCanvas: HTMLCanvasElement) => void; onact: (action: Action) => void; onui: (sound: UiSound, pan?: number) => void; payoff?: boolean; denied?: { at?: CellVec; key: number }; resetToken?: number; suspended?: boolean; onboarding?: 'pour' | 'puff'; waxCue?: boolean; onlearn?: () => void } = $props();
 	let terrainCanvas: HTMLCanvasElement;
 	let liquidCanvas: HTMLCanvasElement;
 	let airCanvas: HTMLCanvasElement;
@@ -34,18 +34,18 @@
 	}
 	let virtual = $state({ x: 24, y: 15, visible: false });
 	let stroke = 0;
-	let gesture: { pointer: number; at: Vec; stroke: number; spring: string | null; origin: Vec; started: number; moved: boolean } | null = null;
-	let drag: { pointer: number; id: string; at: Vec; value: number; count: number } | null = null;
+	let gesture: { pointer: number; at: CellVec; stroke: number; spring: string | null; origin: CellVec; started: number; moved: boolean } | null = null;
+	let drag: { pointer: number; id: string; at: CellVec; value: number; count: number } | null = null;
 	let owner: { id: number; target: HTMLElement } | null = null;
 	let keyHeld = false;
 	let keySpring: string | null = null;
-	const strokes = new Map<number, Vec[]>();
+	const strokes = new Map<number, CellVec[]>();
 	const colors = ['#6ec6ff', '#f2b134', '#e8608a'];
 	const gaugeColors = ['#2798dc', '#bf861b', '#dc5b82'];
 	const names = ['Dew (blue)', 'Sap (gold)', 'Rose (pink)'];
 	const glyphs = ['◆', '●', '▲'];
 	const words = (id: string) => id.replace('sap-urn', 'gold vessel').replaceAll('urn', 'vessel').replaceAll('-', ' ');
-	const springAt = (at: Vec) => level.springs.find(s => at.x >= s.zone.x && at.x <= s.zone.x + s.zone.w && at.y >= s.zone.y && at.y <= s.zone.y + s.zone.h);
+	const springAt = (at: CellVec) => level.springs.find(s => at.x >= s.zone.x && at.x <= s.zone.x + s.zone.w && at.y >= s.zone.y && at.y <= s.zone.y + s.zone.h);
 	const recipeWords = (r: Recipe) => r.mix.map((n, i) => n ? `${n} ${n === 1 ? 'part' : 'parts'} ${names[i].toLowerCase()}` : '').filter(Boolean).join(', ');
 	function forbidden(r: Recipe, u?: UrnView) {
 		const total = u?.counts.reduce((a, b) => a + b, 0) ?? 0;
@@ -79,13 +79,13 @@
 	$effect(() => { resetToken; lastStir = -Infinity; lastWaste = 0; strokes.clear(); terrainRevision = -1; tool = 'hand'; virtual = { x: 24, y: 15, visible: false }; });
 	$effect(() => { if (terrainCanvas && view && terrainRevision !== view.terrainRevision) { drawTerrain(terrainCanvas, view.terrain); terrainRevision = view.terrainRevision; } });
 	onMount(() => { oncanvas(liquidCanvas, airCanvas); board.focus({ preventScroll: true }); return () => cancel(undefined, 'navigation'); });
-	function point(e: PointerEvent): Vec { const r = board.getBoundingClientRect(); return { x: Math.max(0, Math.min(48, (e.clientX - r.left) / r.width * 48)), y: Math.max(0, Math.min(30, (e.clientY - r.top) / r.height * 30)) }; }
-	function erase(at: Vec) {
+	function point(e: PointerEvent): CellVec { const r = board.getBoundingClientRect(); return { x: Math.max(0, Math.min(48, (e.clientX - r.left) / r.width * 48)), y: Math.max(0, Math.min(30, (e.clientY - r.top) / r.height * 30)) }; }
+	function erase(at: CellVec) {
 		let nearest = -1, distance = 1.8;
 		for (const [id, points] of strokes) for (const p of points) { const d = Math.hypot(p.x - at.x, p.y - at.y); if (d < distance) { nearest = id; distance = d; } }
 		if (nearest >= 0) { onact({ type: 'erase', stroke: nearest }); strokes.delete(nearest); onui('erase'); }
 	}
-	function apply(at: Vec, from = at, id = ++stroke) {
+	function apply(at: CellVec, from = at, id = ++stroke) {
 		if (tool === 'ink') { onact({ type: 'ink', stroke: id, from, to: at }); const points = strokes.get(id) ?? []; const count = Math.max(1, Math.ceil(Math.hypot(at.x - from.x, at.y - from.y) / .4)); for (let i = 0; i <= count; i++) points.push({ x: from.x + (at.x - from.x) * i / count, y: from.y + (at.y - from.y) * i / count }); strokes.set(id, points); }
 		else if (tool === 'dig') { const count = Math.max(1, Math.ceil(Math.hypot(at.x - from.x, at.y - from.y) / .4)); for (let i = 0; i <= count; i++) onact({ type: 'dig', at: { x: from.x + (at.x - from.x) * i / count, y: from.y + (at.y - from.y) * i / count }, radius: .65 }); }
 		else if (tool === 'erase') erase(at);

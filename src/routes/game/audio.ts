@@ -278,7 +278,7 @@ export function createAudio(
 			.map((speed) => Math.abs(speed))
 			.filter(Number.isFinite)
 			.filter((speed) => speed > 0.01);
-		// ponytail: eight fixed hum slots bound node use; raise the ceiling if rooms need more voices.
+		// Simplification: eight fixed hum slots bound node use; raise the ceiling if rooms need more voices.
 		const values = [
 			...Array(Math.min(4, machines)).fill(0),
 			...speeds.slice(0, 4),
@@ -373,7 +373,7 @@ export function createAudio(
 		target(sceneGain.gain, 1, 0.65);
 		if (old) {
 			target(old.gain, 0, 0.65);
-			// ponytail: old layers disconnect after the crossfade; add a scheduler if fades become configurable.
+			// Simplification: old layers disconnect after the crossfade; add a scheduler if fades become configurable.
 			setTimeout(() => {
 				try {
 					old.disconnect();

@@ -1,3 +1,4 @@
+const BENCH = import.meta.env.VERDIGRIS_BENCH_DIR;
 import { expect, it } from 'vitest';
 import { commands } from 'vitest/browser';
 import { LiquidEngine } from 'svelte-fluid/experimental';
@@ -85,7 +86,7 @@ it('Breath runtime is identical across three asynchronous readback schedules', a
 			for (const element of [canvas, airCanvas]) element.getContext('webgl2')?.getExtension('WEBGL_lose_context')?.loseContext();
 		}
 	}
-	await (commands as unknown as { writeBenchJson(path: string, json: string): Promise<void> }).writeBenchJson('/tmp/verdigris-v2-determinism.json', JSON.stringify(results, null, 2));
+	await (commands as unknown as { writeBenchJson(path: string, json: string): Promise<void> }).writeBenchJson(`${BENCH}/v2-determinism.json`, JSON.stringify(results, null, 2));
 	console.info('Breath runtime determinism', JSON.stringify(results));
 	expect(results[1]).toEqual(results[0]);
 	expect(results[2]).toEqual(results[0]);

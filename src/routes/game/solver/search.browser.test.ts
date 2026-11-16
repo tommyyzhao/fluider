@@ -1,3 +1,4 @@
+const BENCH = import.meta.env.VERDIGRIS_BENCH_DIR;
 import { describe, expect, it } from "vitest";
 import { commands } from "vitest/browser";
 import { LEVELS } from "../levels.js";
@@ -20,7 +21,7 @@ const output = commands as unknown as {
 const run = import.meta.env.VITE_SOLVER_RUN ?? "";
 const room = import.meta.env.VITE_SOLVER_ROOM ?? "";
 // Fresh experiments get their own directory so stale checkpoints never resume into them.
-const OUT = import.meta.env.VITE_SOLVER_OUT ?? "/tmp/verdigris-v3/solver";
+const OUT = import.meta.env.VITE_SOLVER_OUT ?? `${BENCH}/v3/solver`;
 const BUDGET = Number(import.meta.env.VITE_SOLVER_BUDGET ?? 12);
 const SEEDS = [1, 71, 429];
 const PERTURB_SEEDS = Array.from({ length: 10 }, (_, i) => 71 + i * 97);

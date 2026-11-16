@@ -8,15 +8,22 @@
  * cells. Liquid amounts are in units: one unit = MARKERS_PER_UNIT markers.
  */
 import type {
-	Counts,
+	SpeciesCounts,
 	LiquidScene,
 	LiquidTick,
 	SensorFrame,
-	Species,
-	Vec
+	LiquidSpecies,
+	CellVec
 } from 'svelte-fluid/experimental';
 
-export type { Counts, LiquidScene, LiquidTick, SensorFrame, Species, Vec };
+export type { SpeciesCounts, LiquidScene, LiquidTick, SensorFrame, LiquidSpecies, CellVec };
+
+/**
+ * Game-owned solid tags, stored in terrain as values 2..6. The values are saved
+ * with levels and progress, so they must not change. The engine treats every
+ * non-zero cell as solid; only the game gives these tags meaning.
+ */
+export const Tag = { Loam: 2, Ink: 3, Gate: 4, Vine: 5, Root: 6 } as const;
 
 export const LEVEL_W = 48;
 export const LEVEL_H = 30;
@@ -63,7 +70,7 @@ export type Terrain = readonly string[];
  */
 export interface Spring {
 	id: string;
-	species: Species;
+	species: LiquidSpecies;
 	/** Where pouring is allowed (and drawn as cloud / crack / bloom). */
 	zone: Box;
 	/** Units available; Infinity only in sandbox. */
@@ -79,17 +86,17 @@ export interface Spring {
 export interface Vent {
 	id: string;
 	/** Line source in LU. */
-	from: Vec;
-	to: Vec;
+	from: CellVec;
+	to: CellVec;
 	/** Air velocity, LU per second (x right, y down). */
-	velocity: Vec;
+	velocity: CellVec;
 	/** Radius of influence, LU (default 1.5). */
 	radius?: number;
 	/** An unseen draft: no vent fixture or automatic mist; player puffs reveal it. */
 	hidden?: boolean;
 	control?:
 		| { kind: 'switch'; on: boolean }
-		| { kind: 'turn'; velocities: readonly Vec[]; index: number };
+		| { kind: 'turn'; velocities: readonly CellVec[]; index: number };
 }
 
 /** Reservoir sensor interior in LU. */
@@ -102,7 +109,7 @@ export interface Gauge {
 /** A rotating solid deflector (gutter/plank) with detents. */
 export interface Plank {
 	id: string;
-	pivot: Vec;
+	pivot: CellVec;
 	length: number;
 	/** Thickness, LU (default 0.5 = 2 cells). */
 	thickness?: number;
@@ -146,7 +153,7 @@ export interface Seed {
 	id: string;
 	box: Box;
 	recipe: Recipe;
-	/** Vine body in growth order; becomes solid VINE terrain. */
+	/** Vine body in growth order; becomes solid Tag.Vine terrain. */
 	vine: readonly Box[];
 	/** Player plug that empties the basin after a wrong watering. */
 	plug?: string;
@@ -164,7 +171,7 @@ export interface Bramble {
 export interface Wheel {
 	id: string;
 	sensor: Box;
-	at: Vec;
+	at: CellVec;
 	radius: number;
 }
 
@@ -233,7 +240,7 @@ export interface Level {
 	/** Whether the dig tool is available. */
 	dig: boolean;
 	/** Liquid already present (puddles, pools) at load. */
-	pools: readonly { species: Species; box: Box; units: number }[];
+	pools: readonly { species: LiquidSpecies; box: Box; units: number }[];
 	mastery: Mastery;
 	/** Relationship → location → procedure. Shown only on request. */
 	hints: readonly [string, string, string];
@@ -243,19 +250,19 @@ export interface Level {
 
 export type Action =
 	/** Start/move pouring from a spring at `at` (LU, clamped into its zone); `spring: null` stops. */
-	| { type: 'pour'; spring: string | null; at?: Vec }
+	| { type: 'pour'; spring: string | null; at?: CellVec }
 	/** Stir the air along a pointer segment (LU); presentation/air layer only, recorded for replay. */
-	| { type: 'stir'; from: Vec; to: Vec }
+	| { type: 'stir'; from: CellVec; to: CellVec }
 	/** Dye only; one accepted puff per 20 model ticks. */
-	| { type: 'puff'; at: Vec }
+	| { type: 'puff'; at: CellVec }
 	| { type: 'pose'; id: string; index: number }
 	| { type: 'toggle'; id: string }
 	/** Ink stroke segment (LU). Cells are claimed only where dry air. */
-	| { type: 'ink'; stroke: number; from: Vec; to: Vec }
+	| { type: 'ink'; stroke: number; from: CellVec; to: CellVec }
 	/** Remove a whole stroke; refunds its cells. */
 	| { type: 'erase'; stroke: number }
 	/** Dig loam in a disc (LU). */
-	| { type: 'dig'; at: Vec; radius: number };
+	| { type: 'dig'; at: CellVec; radius: number };
 
 /**
  * 'ready' = enough liquid, in tune, uncontaminated. The room clears when every
@@ -265,7 +272,7 @@ export type UrnStatus = 'filling' | 'ready' | 'complete' | 'spoiled';
 
 export interface UrnView {
 	id: string;
-	counts: Counts;
+	counts: SpeciesCounts;
 	/** Units in the urn. */
 	units: number;
 	status: UrnStatus;
@@ -282,9 +289,9 @@ export interface RoomView {
 	/** Remaining well units per spring id. */
 	springs: Readonly<Record<string, number>>;
 	/** Spring currently pouring and its clamped emitter (LU), or null. */
-	pouring: { spring: string; at: Vec } | null;
+	pouring: { spring: string; at: CellVec } | null;
 	/** Current velocities in LU/s, including always-on authored vents. */
-	vents: Readonly<Record<string, Vec>>;
+	vents: Readonly<Record<string, CellVec>>;
 	/** Switch 0/1 or turn detent index; controllable vents only. */
 	ventControls: Readonly<Record<string, number>>;
 	/** Surface is a volume-derived estimate, y-down LU. */
@@ -320,16 +327,16 @@ export interface RoomView {
 
 export type GameEvent =
 	| { type: 'pour'; spring: string | null }
-	| { type: 'puff'; at: Vec }
-	| { type: 'vent'; id: string; velocity: Vec; index: number }
+	| { type: 'puff'; at: CellVec }
+	| { type: 'vent'; id: string; velocity: CellVec; index: number }
 	| { type: 'pose'; id: string; index: number }
 	| { type: 'gate'; id: string; open: boolean }
 	| {
 			type: 'denied';
 			reason: 'ink-empty' | 'wet' | 'not-diggable' | 'supply-empty' | 'busy';
-			at?: Vec;
+			at?: CellVec;
 	  }
-	| { type: 'splash'; at: Vec; strength: number }
+	| { type: 'splash'; at: CellVec; strength: number }
 	| { type: 'urn'; id: string; status: UrnStatus }
 	| { type: 'seed'; id: string; status: 'growing' | 'grown' | 'spoiled' }
 	| { type: 'bramble'; id: string }
@@ -401,9 +408,9 @@ export interface GardenAudio {
  */
 export interface AirLayer {
 	/** Inject a stir segment (LU) this tick; bounded internally. */
-	stir(from: Vec, to: Vec): void;
+	stir(from: CellVec, to: CellVec): void;
 	/** Accepted, clamped model puff; dye only, never wind. */
-	puff(at: Vec): void;
+	puff(at: CellVec): void;
 	/** Rebuild air obstructions from the sim terrain (192×120 CellKind, top row first). */
 	syncTerrain(terrain: Uint8Array, revision: number): void;
 	/** Advance one game tick (1/60 s) and queue a wind snapshot tagged `tick`. */

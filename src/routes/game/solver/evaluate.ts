@@ -3,7 +3,7 @@ import { createAirLayer } from '../air.js';
 import { fixedAir, gpuProfiler, particleHash } from './coupling.js';
 import { createRoom } from '../model.js';
 import { replayActions } from '../runtime.js';
-import type { AirLayer, Level, RoomModel, RoomView, Vec } from '../types.js';
+import type { AirLayer, Level, RoomModel, RoomView, CellVec } from '../types.js';
 
 export type Timeline = Level['solution'];
 export interface EvaluationState {
@@ -455,7 +455,7 @@ export function perturbTimeline(
 ): Timeline {
 	if (![timing, position].every((n) => Number.isFinite(n) && n >= 0))
 		throw new RangeError('Perturbation bounds must be finite and nonnegative');
-	const point = (p: Vec) => ({
+	const point = (p: CellVec) => ({
 		x: p.x + (rand() * 2 - 1) * position,
 		y: p.y + (rand() * 2 - 1) * position,
 	});

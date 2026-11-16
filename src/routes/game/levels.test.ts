@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { AIR, INK } from 'svelte-fluid/experimental';
 import { LEVELS, SANDBOX, sweep } from './levels.js';
 import { createRoom } from './model.js';
-import { LEVEL_H, LEVEL_W, SCALE, type Box, type Level } from './types.js';
+import { Cell } from 'svelte-fluid/experimental';
+import { LEVEL_H, LEVEL_W, SCALE, Tag, type Box, type Level } from './types.js';
 
 const W = LEVEL_W * SCALE;
 const H = LEVEL_H * SCALE;
@@ -26,13 +26,13 @@ function inside(box: Box) {
 function reachesDrain(level: Level, start: number[]): boolean {
 	const terrain = createRoom(level).scene().terrain;
 	const drains = new Set(level.drains.flatMap((d) => cells(d.box)));
-	const seen = new Set(start.filter((i) => terrain[i] === AIR));
+	const seen = new Set(start.filter((i) => terrain[i] === Cell.Air));
 	const queue = [...seen];
 	for (let n = 0; n < queue.length; n++) {
 		const i = queue[n];
 		if (drains.has(i)) return true;
 		for (const j of [i - W, i + W, ...(i % W ? [i - 1] : []), ...(i % W < W - 1 ? [i + 1] : [])]) {
-			if (j < 0 || j >= W * H || seen.has(j) || terrain[j] !== AIR) continue;
+			if (j < 0 || j >= W * H || seen.has(j) || terrain[j] !== Cell.Air) continue;
 			seen.add(j);
 			queue.push(j);
 		}
@@ -122,7 +122,7 @@ describe.each([...LEVELS, SANDBOX].map((level) => [level.id, level] as const))('
 			expect(spring.rate).toBeGreaterThan(0);
 			expect(spring.well).toBeGreaterThan(0);
 			if (level !== SANDBOX) expect(Number.isFinite(spring.well)).toBe(true);
-			for (const i of cells(spring.zone)) expect(terrain[i], `${spring.id}: zone ${i}`).toBe(AIR);
+			for (const i of cells(spring.zone)) expect(terrain[i], `${spring.id}: zone ${i}`).toBe(Cell.Air);
 			const room = createRoom(level);
 			for (const p of [
 				{ x: -100, y: -100 },
@@ -138,7 +138,7 @@ describe.each([...LEVELS, SANDBOX].map((level) => [level.id, level] as const))('
 					w: 1,
 					h: 1
 				}))
-					expect(terrain[i]).toBe(AIR);
+					expect(terrain[i]).toBe(Cell.Air);
 			}
 		}
 	});
@@ -156,15 +156,15 @@ describe.each([...LEVELS, SANDBOX].map((level) => [level.id, level] as const))('
 		for (const s of [...level.seeds, ...level.brambles]) for (const v of s.vine) inside(v);
 		const terrain = createRoom(level).scene().terrain;
 		for (const u of [...level.urns, ...level.seeds])
-			for (const i of cells(u.box)) expect(terrain[i], `${u.id}: ${i}`).toBe(AIR);
+			for (const i of cells(u.box)) expect(terrain[i], `${u.id}: ${i}`).toBe(Cell.Air);
 		for (const e of [...level.drains, ...level.pools])
-			for (const i of cells(e.box)) expect(terrain[i], `interior ${i}`).toBe(AIR);
+			for (const i of cells(e.box)) expect(terrain[i], `interior ${i}`).toBe(Cell.Air);
 		for (const w of level.wheels)
-			for (const i of cells(w.sensor)) expect(terrain[i], `${w.id}: ${i}`).toBe(AIR);
+			for (const i of cells(w.sensor)) expect(terrain[i], `${w.id}: ${i}`).toBe(Cell.Air);
 		for (const v of level.vents) {
 			for (const p of [v.from, v.to]) {
 				inside({ ...p, w: 0.25, h: 0.25 });
-				expect(terrain[Math.floor(p.y * SCALE) * W + Math.floor(p.x * SCALE)]).toBe(AIR);
+				expect(terrain[Math.floor(p.y * SCALE) * W + Math.floor(p.x * SCALE)]).toBe(Cell.Air);
 			}
 			expect(Number.isFinite(v.velocity.x) && Number.isFinite(v.velocity.y)).toBe(true);
 		}
@@ -195,13 +195,13 @@ describe.each([...LEVELS, SANDBOX].map((level) => [level.id, level] as const))('
 		for (const u of level.urns) {
 			const { x, y, w, h } = u.box;
 			const mouth = cells({ x, y: y - 0.25, w, h: 0.25 });
-			for (const i of mouth) expect(terrain[i], `${u.id}: rim ${i}`).toBe(AIR);
+			for (const i of mouth) expect(terrain[i], `${u.id}: rim ${i}`).toBe(Cell.Air);
 			if (h >= 5)
 				for (const i of cells({ x: x + w, y, w: 1, h: 1 }))
-					expect(terrain[i], `${u.id}: lip ${i}`).toBe(AIR);
+					expect(terrain[i], `${u.id}: lip ${i}`).toBe(Cell.Air);
 			expect(reachesDrain(level, mouth), `${u.id}: spill route`).toBe(true);
 			for (const i of cells({ x, y: y + h, w, h: 0.25 }))
-				expect(terrain[i], `${u.id}: floor ${i}`).not.toBe(AIR);
+				expect(terrain[i], `${u.id}: floor ${i}`).not.toBe(Cell.Air);
 		}
 	});
 	it('has three short hints and ordered, valid pour/stir candidate replays', () => {
@@ -238,7 +238,7 @@ it('Breath gravity-only rays from the entire spring miss all interception gutter
 	const spring = level.springs[0];
 	for (let x = spring.zone.x * SCALE; x < (spring.zone.x + spring.zone.w) * SCALE; x++) {
 		for (let y = (spring.zone.y + spring.zone.h) * SCALE; y < 27 * SCALE; y++)
-			expect(terrain[y * W + x]).toBe(AIR);
+			expect(terrain[y * W + x]).toBe(Cell.Air);
 	}
 	expect(level.vents[0].velocity.x).toBeGreaterThan(0);
 	expect(level.vents[0].control).toEqual({ kind: 'switch', on: false });
@@ -256,6 +256,6 @@ it('wax cannot seal campaign urn interiors or spring zones', () => {
 				to: { x: box.x + box.w - 0.5, y: box.y + 0.5 }
 			});
 		expect(room.view().inkUsed).toBe(0);
-		expect(room.planTick().edits.some((e) => e.kind === INK)).toBe(false);
+		expect(room.planTick().edits.some((e) => e.kind === Tag.Ink)).toBe(false);
 	}
 });

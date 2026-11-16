@@ -1,9 +1,9 @@
 import { sweep } from '../rooms/kit.js';
-import type { Action, Level, Vec } from '../types.js';
+import type { Action, Level, CellVec } from '../types.js';
 
 export type Gene =
 	| { kind: 'pour'; spring: string; x: number; start: number; duration: number }
-	| { kind: 'sweep'; from: Vec; to: Vec; start: number; ticks: number }
+	| { kind: 'sweep'; from: CellVec; to: CellVec; start: number; ticks: number }
 	| {
 			kind: 'edit';
 			start: number;
@@ -18,7 +18,7 @@ export const seeded = (seed: number) => () => {
 const clamp = (v: number, lo: number, hi: number) =>
 	Math.max(lo, Math.min(hi, v));
 const grid = (v: number) => Math.max(0, Math.round(v / GRID) * GRID);
-const point = (p: Vec): Vec => ({ x: clamp(p.x, 0, 48), y: clamp(p.y, 0, 30) });
+const point = (p: CellVec): CellVec => ({ x: clamp(p.x, 0, 48), y: clamp(p.y, 0, 30) });
 
 /** Conservative static resource bounds; model.act remains the authority for wet/dry terrain. */
 export function normalize(
@@ -193,7 +193,7 @@ export function mutate(
 	rand: () => number,
 	horizon = 1200
 ): Gene[] {
-	// ponytail: autonomous wax/dig topology needs a spatial search.
+	// Simplification: autonomous wax/dig topology needs a spatial search.
 	if (rand() < 0.15) {
 		const controls = randomGenome(level, rand, horizon).filter(
 			(g) => g.kind === 'edit' && (g.action.type === 'toggle' || g.action.type === 'pose')

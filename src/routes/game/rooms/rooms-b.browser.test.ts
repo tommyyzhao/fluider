@@ -1,3 +1,4 @@
+const BENCH = import.meta.env.VERDIGRIS_BENCH_DIR;
 import { expect, it } from 'vitest';
 import { commands } from 'vitest/browser';
 import level from './bring-it-back.js';
@@ -15,7 +16,7 @@ const output = commands as unknown as {
 	writeBenchJson(path: string, json: string): Promise<void>;
 	writeBenchBase64(path: string, base64: string): Promise<void>;
 };
-const out = '/tmp/verdigris-v3/rooms/bring-it-back';
+const out = `${BENCH}/v3/rooms/bring-it-back`;
 const mode = import.meta.env.VITE_ROOMS_B_RUN ?? '';
 const gate = (tick: number) => ({
 	tick,

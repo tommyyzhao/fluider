@@ -1,3 +1,4 @@
+const BENCH = import.meta.env.VERDIGRIS_BENCH_DIR;
 import { describe, expect, it } from 'vitest';
 import { commands } from 'vitest/browser';
 import { LEVELS } from '../levels.js';
@@ -6,7 +7,7 @@ import { evaluate, type Outcome } from './evaluate.js';
 const output = commands as unknown as {
 	writeBenchJson(path: string, json: string): Promise<void>;
 };
-const OUT = '/tmp/verdigris-v3/solver';
+const OUT = `${BENCH}/v3/solver`;
 const long = import.meta.env.VITE_SOLVER_RUN;
 
 describe('real-engine evaluator', () => {

@@ -1,23 +1,23 @@
 // Test/dev fixture only. This deliberately simple particle solver is not the shipped liquid engine.
 import type {
-	Counts,
+	SpeciesCounts,
 	LiquidOptions,
 	LiquidScene,
 	LiquidSim,
 	LiquidTick,
-	Rect,
-	RenderOptions,
+	CellRect,
+	LiquidRenderOptions,
 	SensorFrame,
-	Species,
+	LiquidSpecies,
 } from 'svelte-fluid/experimental';
 type Particle = {
 	x: number;
 	y: number;
 	vx: number;
 	vy: number;
-	species: Species;
+	species: LiquidSpecies;
 };
-const inside = (p: Particle, r: Rect) =>
+const inside = (p: Particle, r: CellRect) =>
 	p.x >= r.x && p.x < r.x + r.w && p.y >= r.y && p.y < r.y + r.h;
 export class FakeLiquid implements LiquidSim {
 	private ctx: CanvasRenderingContext2D;
@@ -36,7 +36,7 @@ export class FakeLiquid implements LiquidSim {
 		this.ctx = ctx;
 		this.randomState = options.seed || 1;
 	}
-	get emitted(): Counts {
+	get emitted(): SpeciesCounts {
 		return [...this.totals];
 	}
 	get capacityLeft() {
@@ -67,9 +67,9 @@ export class FakeLiquid implements LiquidSim {
 			);
 	}
 	private add(
-		species: Species,
+		species: LiquidSpecies,
 		count: number,
-		rect: Rect,
+		rect: CellRect,
 		vx: number,
 		vy: number
 	) {
@@ -121,7 +121,7 @@ export class FakeLiquid implements LiquidSim {
 					Math.min(wind.height - 1, Math.floor((p.y / h) * wind.height))
 				);
 				const i = (y * wind.width + x) * 2;
-				// ponytail: nearest-cell drag is presentation-only; physical assertions use LiquidEngine.
+				// Simplification: nearest-cell drag is presentation-only; physical assertions use LiquidEngine.
 				p.vx += (wind.data[i] - p.vx) * 0.03;
 				p.vy += (wind.data[i + 1] - p.vy) * 0.03;
 			}
@@ -191,7 +191,7 @@ export class FakeLiquid implements LiquidSim {
 		return frames;
 	}
 	compact() {}
-	render(options: RenderOptions) {
+	render(options: LiquidRenderOptions) {
 		const { canvas } = this.options;
 		const c = this.ctx;
 		c.clearRect(0, 0, canvas.width, canvas.height);
