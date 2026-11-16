@@ -4,7 +4,7 @@ import type {
 	Level,
 	RoomView,
 	UrnView,
-	Vec,
+	CellVec,
 } from './types.js';
 
 export type Phase =
@@ -44,8 +44,17 @@ export type Entry = Fields & {
 	exposure_active_ms: number;
 	attempt_active_ms: number;
 };
+/** Key used by an earlier build that persisted the log. Never written now; only purged. */
 export const STORAGE_KEY = 'verdigris-study-buffer-v1';
-const MAX_BYTES = 4_000_000;
+
+/** Deletes a stale persisted study log left by an earlier build. Safe to call with no storage. */
+export function purgeStaleStudyBuffer(storage: Pick<Storage, 'removeItem'> | undefined) {
+	try {
+		storage?.removeItem(STORAGE_KEY);
+	} catch {
+		/* Storage may be disabled. */
+	}
+}
 const PHASES: Phase[] = [
 	'controls',
 	'scored_silent',
@@ -140,7 +149,7 @@ const allowed = Object.fromEntries(
 const code = (v: unknown) =>
 	typeof v === 'string' && /^[a-zA-Z0-9_.-]{1,80}$/.test(v) ? v : null;
 const finite = (n: number) => (Number.isFinite(n) ? n : null);
-const point = (v?: Vec | null) =>
+const point = (v?: CellVec | null) =>
 	v && Number.isFinite(v.x) && Number.isFinite(v.y)
 		? {
 				x: Math.round(Math.max(0, Math.min(48, v.x)) * 10) / 10,
@@ -194,7 +203,7 @@ function actionData(action: Action): Fields {
 			data[key] = a[key];
 	if (typeof a.enabled === 'boolean') data.enabled = a.enabled;
 	for (const key of ['at', 'from', 'to'])
-		if (key in a) data[key] = point(a[key] as Vec);
+		if (key in a) data[key] = point(a[key] as CellVec);
 	return data;
 }
 export interface StudyOptions {
@@ -205,7 +214,8 @@ export interface StudyOptions {
 		face: boolean;
 	};
 	now?: () => number;
-	storage?: Pick<Storage, 'setItem' | 'removeItem'>;
+	/** Only used to purge a stale persisted log; the recorder never writes storage. */
+	storage?: Pick<Storage, 'removeItem'>;
 	sessionId?: string;
 	capEvents?: number;
 	criticalReserve?: number;
@@ -304,7 +314,7 @@ export class Telemetry {
 	private pour?: {
 		id: string;
 		spring: string;
-		at: Vec | null;
+		at: CellVec | null;
 		before: number;
 		active: number;
 		lastPoint: number;
@@ -317,14 +327,14 @@ export class Telemetry {
 		id: string;
 		t0: number;
 		tick: number;
-		from: Vec;
-		to: Vec;
+		from: CellVec;
+		to: CellVec;
 		length: number;
 		count: number;
 		dx: number;
 		dy: number;
-		min: Vec;
-		max: Vec;
+		min: CellVec;
+		max: CellVec;
 		points: { dt_ms: number; x: number; y: number }[];
 		sampledAt: number;
 		before: RoomView;
@@ -337,8 +347,8 @@ export class Telemetry {
 	private denials = new Set<string>();
 	private releaseCause: Stop = 'release';
 	private dwell?: {
-		anchor: Vec;
-		sum: Vec;
+		anchor: CellVec;
+		sum: CellVec;
 		n: number;
 		radius: number;
 		t0: number;
@@ -741,8 +751,8 @@ export class Telemetry {
 				before?.ventControls[data.id as string] !== next.ventControls[data.id as string];
 		else if (data.type === 'toggle') meaningful &&= pending.semantic;
 		if (data.type === 'stir' && data.from && data.to) {
-			const f = data.from as Vec,
-				t = data.to as Vec;
+			const f = data.from as CellVec,
+				t = data.to as CellVec;
 			meaningful &&= f.x !== t.x || f.y !== t.y;
 		}
 		if (meaningful) {
@@ -868,8 +878,8 @@ export class Telemetry {
 	) {
 		const from = (data.from ??
 				(data.type === 'dig' ? this.stroke?.to : null) ??
-				data.at) as Vec | null,
-			to = (data.to ?? data.at) as Vec | null;
+				data.at) as CellVec | null,
+			to = (data.to ?? data.at) as CellVec | null;
 		if (!from || !to) return;
 		if (
 			this.stroke &&
@@ -1110,7 +1120,7 @@ export class Telemetry {
 				via,
 			});
 	}
-	cursor(at: Vec | null, pointerKind: string, down: boolean) {
+	cursor(at: CellVec | null, pointerKind: string, down: boolean) {
 		if (this.ended || !this.active || down || this.held || this.pour || !at) {
 			this.flushDwell();
 			return;
@@ -1410,11 +1420,7 @@ export class Telemetry {
 		this.finish('withdrawn');
 		if (!retain) {
 			this.events = [];
-			try {
-				this.options.storage?.removeItem(STORAGE_KEY);
-			} catch {
-				/* Storage may be disabled. */
-			}
+			purgeStaleStudyBuffer(this.options.storage);
 			this.unsaved = false;
 		}
 	}
@@ -1430,16 +1436,10 @@ export class Telemetry {
 			complete_log: this.ended && this.complete && !this.exhausted,
 		};
 	}
+	/** Memory-only: the log is never written to browser storage; export is the only way out. */
 	serialize() {
 		const json = JSON.stringify(this.export(), null, 2);
 		parseStudyLog(json);
-		try {
-			if (json.length <= MAX_BYTES)
-				this.options.storage?.setItem(STORAGE_KEY, json);
-			else this.options.storage?.removeItem(STORAGE_KEY);
-		} catch {
-			/* Explicit export still works when local storage is unavailable/full. */
-		}
 		return json;
 	}
 	saved() {

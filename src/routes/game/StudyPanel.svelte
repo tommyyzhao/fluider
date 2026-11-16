@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { createTelemetry, hashData, type Telemetry, type Phase } from './telemetry.js';
+	import { createTelemetry, hashData, purgeStaleStudyBuffer, type Telemetry, type Phase } from './telemetry.js';
 	import type { Level } from './types.js';
 	let { levels, onrecorder, onchoice, onpause }: { levels: readonly Level[]; onrecorder: (recorder: Telemetry) => void; onchoice: (choice: string, roomId?: string) => void; onpause: (paused: boolean) => void } = $props();
 	let requested = $state(false);
@@ -29,6 +29,7 @@
 	onMount(() => {
 		selectedRoom = levels[0]?.id ?? '';
 		requested = new URLSearchParams(location.search).get('study') === '1';
+		purgeStaleStudyBuffer(storageOrNull());
 		const unload = (e: BeforeUnloadEvent) => { if (recorder?.unsaved && !withdrawn) { e.preventDefault(); e.returnValue = ''; } };
 		const hide = () => { clearInterval(pulse); recorder?.finish('navigation', false); };
 		const show = (e: PageTransitionEvent) => { if (e.persisted && recorder?.ended) { finished = true; researchBreak = false; onpause(false); message = 'Recording ended when this page was left. Restored page is not recording; save the ended log or reload to start a new study.'; } };
@@ -40,11 +41,15 @@
 	$effect(() => { if (requested && consent && !consent.open) consent.showModal(); });
 	function accept() {
 		if (!/^[A-Za-z0-9_.-]{1,40}$/.test(round) || !/^[A-Za-z0-9_.-]{1,40}$/.test(participant)) { message = 'Use study codes only: letters, numbers, dots, hyphens or underscores.'; return; }
-		let storage: Storage | undefined;
-		try { storage = window.localStorage; } catch { /* Consent remains usable without browser storage. */ }
+		const storage = storageOrNull();
+		purgeStaleStudyBuffer(storage);
 		recorder = createTelemetry(levels, { consent: { telemetry: true, screen: false, voice: false, face: false }, storage, metadata: { round_id: round, participant_id: participant, viewport_bucket: innerWidth < 600 ? 'compact' : innerWidth < 1200 ? 'medium' : 'large', build_hash: import.meta.env.VITE_STUDY_BUILD_HASH, engine_settings_hash: hashData({ width: 192, height: 120, hz: 60, seed: 71429 }), protocol_version: '1', session_format: format, remote, input_class: inputClass, strategy_dictionary_version: strategy, assessed_room_ids: assessed, not_assessed_gates: format === 'lean' ? ['strategy_autonomy'] : [], free_choice_cap_ms: format === 'lean' ? 180000 : 300000, compatibility }, onLimit: () => warning = true });
 		if (recorder) { onrecorder(recorder); pulse = setInterval(() => recorder?.pulse(), 500); }
 		requested = false; consent?.close(); message = '';
+	}
+	/** Browser storage is only touched to purge a stale log; it may be unavailable. */
+	function storageOrNull(): Storage | undefined {
+		try { return window.localStorage; } catch { return undefined; }
 	}
 	function decline() { requested = false; consent?.close(); message = 'Study recording declined. Gameplay remains available.'; }
 	function download() {
@@ -58,6 +63,8 @@
 	}
 	async function copy() { if (!recorder) return; try { await navigator.clipboard.writeText(recorder.serialize()); message = 'Log copied. Nothing uploaded.'; } catch { message = 'Copy blocked; use Download log.'; } }
 	function finish() { clearInterval(pulse); recorder?.finish(); researchBreak = false; onpause(false); finished = true; if (downloadConsent) download(); else message = 'Study finished. Save only if you want to; nothing uploaded.'; }
+	/** Same deletion as revoke(false): clears the in-memory log and purges any stale stored copy. */
+	function deleteLog() { recorder?.revoke(false); deleted = true; withdrawn = false; message = 'Local log deleted. Previously downloaded copies are yours to delete.'; }
 	function revoke() { clearInterval(pulse); recorder?.finish('withdrawn'); researchBreak = false; onpause(false); withdrawn = true; finished = true; message = 'Recording stopped immediately. Retain or delete your previously consented local log.'; }
 	function choice(value: string) { if (value === 'stop') { clearInterval(pulse); finished = true; } recorder?.selectChoice(value, ['replay', 'continue'].includes(value) ? selectedRoom : undefined); onchoice(value, selectedRoom); }
 	function changePhase() { recorder?.phaseChange(phase); syncPause(); if (phase === 'free_choice') recorder?.choices(['replay', 'continue', 'sandbox', 'stop', 'break']); }
@@ -68,10 +75,12 @@
 {#if requested}
 	<dialog bind:this={consent} aria-labelledby="study-consent-title" oncancel={e => { e.preventDefault(); decline(); }}>
 		<h2 id="study-consent-title">Optional local playtest log</h2>
-		<p>Record board actions, hints, room outcomes and elapsed times under study codes, not your name. No network uploads, cookies, screen, voice or face capture. The local buffer is capped; closing or refreshing can lose unsaved data.</p>
+		<p>Record board actions, hints, room outcomes and elapsed times under study codes, not your name. The log is held in memory only. Nothing is uploaded, and nothing is stored after the page closes. Only you can export it, by downloading or copying it. Closing or refreshing the page discards it unless you exported it first. No cookies, screen, voice or face capture.</p>
 		<p>Participation is optional. Declining or stopping does not affect gameplay or compensation. You may stop immediately, keep or delete your log, or decline handing it over. The owner keeps coded logs up to 90 days; request withdrawal within 14 days using your study code. Screen, voice and face permissions are separate, outside this game.</p>
-		<label>Round code <input aria-label="Round code" bind:value={round} maxlength="40" autocomplete="off"/></label>
-		<label>Participant code <input aria-label="Participant code" bind:value={participant} maxlength="40" autocomplete="off"/></label>
+		<label>Round code <input aria-label="Round code" bind:value={round} maxlength="40" autocomplete="off" aria-describedby="round-hint"/></label>
+		<small id="round-hint">Round code: not your name or email.</small>
+		<label>Participant code <input aria-label="Participant code" bind:value={participant} maxlength="40" autocomplete="off" aria-describedby="participant-hint"/></label>
+		<small id="participant-hint">Participant code: not your name or email.</small>
 		<details><summary>Facilitator freeze-sheet metadata</summary>
 			<label>Session format <select bind:value={format}><option value="lean">lean</option><option value="full">full</option></select></label>
 			<label><input type="checkbox" bind:checked={remote}/> Remote session</label>
@@ -91,7 +100,8 @@
 		{#if !finished}<button onclick={finish}>Finish study</button><button onclick={revoke}>Stop recording / withdraw</button>{/if}
 		{#if !deleted}<button onclick={download}>Download log</button><button onclick={copy}>Copy log</button>
 		<button onclick={() => { recorder?.saved(); message = 'Save confirmed. Keep the file private; handoff is a separate choice.'; }}>I saved my log</button>{/if}
-		{#if withdrawn}<button onclick={() => { recorder?.revoke(false); deleted = true; withdrawn = false; message = 'Local log deleted. Previously downloaded copies are yours to delete.'; }}>Delete local log</button><button onclick={() => { withdrawn = false; message = 'Previously consented log retained. Capture remains stopped.'; }}>Retain local log</button>{/if}
+		<button onclick={deleteLog}>Delete local log</button>
+		{#if withdrawn}<button onclick={() => { withdrawn = false; message = 'Previously consented log retained. Capture remains stopped.'; }}>Retain local log</button>{/if}
 		{#if warning}<strong role="alert">Log limit reached. Some capture is incomplete. Save now; gameplay is unaffected.</strong>{/if}
 		<span role="status">{message}</span>
 		{#if !finished}

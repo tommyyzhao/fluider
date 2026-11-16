@@ -8,6 +8,7 @@ import {
 	createTelemetry,
 	EVENT_FIELDS,
 	parseStudyLog,
+	purgeStaleStudyBuffer,
 	STORAGE_KEY,
 	type StudyOptions,
 	type Stop,
@@ -132,17 +133,15 @@ describe('opt-in study recorder acceptance', () => {
 
 	it('requires affirmative consent before clocks, IDs, storage or events', () => {
 		const now = vi.fn(),
-			setItem = vi.fn(),
 			removeItem = vi.fn();
 		expect(
 			createTelemetry(LEVELS, {
 				consent: { ...consent, telemetry: false },
 				now,
-				storage: { setItem, removeItem },
+				storage: { removeItem },
 			})
 		).toBeUndefined();
 		expect(now).not.toHaveBeenCalled();
-		expect(setItem).not.toHaveBeenCalled();
 		expect(removeItem).not.toHaveBeenCalled();
 	});
 	it('pairs one accepted pour, clamped same-spring path, release and consumption', () => {
@@ -373,9 +372,8 @@ describe('opt-in study recorder acceptance', () => {
 		expect(f.events('observer_marker')[0].code).toBe('IMPASSE_IDLE');
 	});
 	it('round trips null/unlimited with finite clocks, safe fields and complete paired lifecycle', () => {
-		const setItem = vi.fn(),
-			removeItem = vi.fn();
-		const f = fixture({ storage: { setItem, removeItem } }, true);
+		const removeItem = vi.fn();
+		const f = fixture({ storage: { removeItem } }, true);
 		f.pour();
 		f.time(500);
 		f.recorder.finish();
@@ -390,7 +388,6 @@ describe('opt-in study recorder acceptance', () => {
 			wells: object[];
 		};
 		expect(state.wells[0]).toMatchObject({ units: null, unlimited: true });
-		expect(setItem).toHaveBeenCalledWith(STORAGE_KEY, expect.any(String));
 		expect(log.events.map((e) => e.seq)).toEqual(
 			log.events.map((_, i) => i + 1)
 		);
@@ -502,9 +499,27 @@ describe('opt-in study recorder acceptance', () => {
 			strength: 3,
 		});
 	});
+	it('keeps the study log in memory: serialize never writes storage and a stale key is purged', () => {
+		const removeItem = vi.fn();
+		// Spy on setItem through a widened object: the recorder must never reach it.
+		const setItem = vi.fn();
+		const storage = { removeItem, setItem } as Pick<Storage, 'removeItem'> & { setItem: typeof setItem };
+		const f = fixture({ storage });
+		f.pour();
+		f.time(500);
+		f.recorder.finish();
+		parseStudyLog(f.recorder.serialize());
+		parseStudyLog(f.recorder.serialize());
+		expect(setItem).not.toHaveBeenCalled();
+		expect(removeItem).not.toHaveBeenCalled();
+		purgeStaleStudyBuffer({ removeItem });
+		expect(removeItem).toHaveBeenCalledExactlyOnceWith(STORAGE_KEY);
+		purgeStaleStudyBuffer(undefined);
+		expect(() => purgeStaleStudyBuffer({ removeItem: () => { throw new Error('denied'); } })).not.toThrow();
+	});
 	it('withdrawal stops capture immediately; offers retained export or deletes only study storage', () => {
 		const removeItem = vi.fn();
-		const f = fixture({ storage: { setItem: vi.fn(), removeItem } });
+		const f = fixture({ storage: { removeItem } });
 		f.recorder.revoke(true);
 		const n = f.recorder.export().events.length;
 		f.pour();
@@ -560,7 +575,7 @@ function runtimeFixture(enabled: boolean) {
 	let time = 0,
 		callback: FrameRequestCallback = () => {},
 		viewCalls = 0;
-	const storage = { setItem: vi.fn(), removeItem: vi.fn() },
+	const storage = { removeItem: vi.fn() },
 		now = vi.fn(() => time);
 	const telemetry = createTelemetry(LEVELS, {
 		consent: { ...consent, telemetry: enabled },
@@ -680,7 +695,6 @@ describe('runtime telemetry boundary', () => {
 		}
 		expect(off.telemetry).toBeUndefined();
 		expect(off.now).not.toHaveBeenCalled();
-		expect(off.storage.setItem).not.toHaveBeenCalled();
 		expect(off.storage.removeItem).not.toHaveBeenCalled();
 		expect(off.actions).toEqual(on.actions);
 		expect(off.steps).toEqual(on.steps);
