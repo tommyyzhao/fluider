@@ -5,7 +5,7 @@
     "": {
       "name": "verdigris",
       "dependencies": {
-        "svelte-fluid": "^1.1.0",
+        "svelte-fluid": "^1.2.0",
       },
       "devDependencies": {
         "@sveltejs/adapter-static": "^3.0.10",
@@ -275,7 +275,7 @@
 
     "svelte-check": ["svelte-check@4.7.8", "", { "dependencies": { "@jridgewell/trace-mapping": "^0.3.25", "@sveltejs/load-config": "^0.2.3", "chokidar": "^4.0.1", "fdir": "^6.2.0", "picocolors": "^1.0.0", "sade": "^1.7.4" }, "peerDependencies": { "svelte": "^4.0.0 || ^5.0.0-next.0", "typescript": "^5.0.0 || ^6.0.0" }, "bin": { "svelte-check": "bin/svelte-check" } }, "sha512-laZ49GFHZ3b0z2PWinJWL0syehc/PTR8aHaUaTiBkWJ+4Y38nhxjmXsSz7CbGa3VdKopViVbrBH3bGNqIAI0bQ=="],
 
-    "svelte-fluid": ["svelte-fluid@1.1.0", "", { "peerDependencies": { "svelte": "^5.0.0" } }, "sha512-IIbXLQfUk3qPMpDF1hx4gpzO/N+eTX2T/Jp8C9/S8VQDmvPk7YP+cIYP07si+iVj6IKY9r4doJjCjju0LK2Z2A=="],
+    "svelte-fluid": ["svelte-fluid@1.2.0", "", { "peerDependencies": { "svelte": "^5.0.0" } }, "sha512-rHeNDuFWEpyy6akdEp1qDBRC/G043o627bATFUcyfQ5BPA9ZY/tnHvpv170HGvvDy+LaapogKQD4vRrYeap/5A=="],
 
     "tinybench": ["tinybench@2.9.0", "", {}, "sha512-0+DUvqWMValLmha6lr4kD8iAMK1HzV0/aKnCtWb9v9641TnP/MFb7Pc2bxoxQjTXAErryXVgUOfv2YqNllqGeg=="],
 

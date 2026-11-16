@@ -15,7 +15,7 @@
 		"test:browser": "VITEST_BROWSER=1 vitest run --project browser"
 	},
 	"dependencies": {
-		"svelte-fluid": "^1.1.0"
+		"svelte-fluid": "^1.2.0"
 	},
 	"devDependencies": {
 		"@sveltejs/adapter-static": "^3.0.10",
