@@ -978,7 +978,7 @@ describe('Fluider contextual gestures', () => {
 				document.querySelector('[data-screen="interlude"]')
 			).not.toBeNull();
 		});
-	it('last room clear opens a player-paced first-wing interlude, then map and sandbox entry', async () => {
+	it('last room clear opens a player-paced first-wing interlude with a local leaderboard and no outbound link, then map and sandbox entry', async () => {
 		await setup({
 			progress: {
 				version: 2,
@@ -999,34 +999,25 @@ describe('Fluider contextual gestures', () => {
 		await page.getByRole('button', { name: 'Wake the first wing →' }).click();
 		expect(document.querySelector('[data-screen="interlude"]')).not.toBeNull();
 		expect(document.body.textContent).toContain('The first wing remembers.');
-		const nextGame = page.getByRole('link', { name: 'Play the next game', exact: true });
-		const link = nextGame.element() as HTMLAnchorElement;
-		expect(link.href).toBe('https://delos.sloprefinery.ai/');
-		expect(link.classList.contains('primary')).toBe(true);
-		await vi.waitFor(() => expect(document.activeElement).toBe(link));
+		expect(document.querySelector('a[href]')).toBeNull();
+		expect(document.body.textContent).not.toContain('sloprefinery');
+		expect(document.querySelector('.leaderboard li.latest')).not.toBeNull();
 		const explore = page.getByRole('button', { name: 'Stay and explore the greenhouse', exact: true });
-		expect(explore.element().classList.contains('primary')).toBe(false);
+		await vi.waitFor(() => expect(document.activeElement).toBe(explore.element()));
 		await wait(7000);
 		expect(document.querySelector('[data-screen="interlude"]')).not.toBeNull();
 		for (const [width, height] of [[1280, 900], [1280, 720], [375, 667]]) {
 			await page.viewport(width, height);
-			const rect = link.getBoundingClientRect();
+			const rect = explore.element().getBoundingClientRect();
 			expect(rect.top).toBeGreaterThanOrEqual(0);
 			expect(rect.bottom).toBeLessThanOrEqual(innerHeight);
-			expect(rect.left).toBeGreaterThanOrEqual(0);
-			expect(rect.right).toBeLessThanOrEqual(innerWidth);
-			expect(rect.height).toBeGreaterThanOrEqual(80);
-			expect(rect.height).toBeGreaterThan(explore.element().getBoundingClientRect().height);
-			expect(Number.parseFloat(getComputedStyle(link).fontSize)).toBeGreaterThan(Number.parseFloat(getComputedStyle(explore.element()).fontSize));
-			await shot(`next-game-${width}x${height}`);
+			await shot(`leaderboard-${width}x${height}`);
 		}
 		await page.viewport(1280, 900);
-		await userEvent.keyboard('{Tab}');
-		expect(document.activeElement).toBe(explore.element());
 		await explore.click();
 		expect(document.querySelector('[data-screen="map"]')).not.toBeNull();
 		expect(document.body.textContent).toContain('Wander the garden');
-		expect((page.getByRole('link', { name: 'Play the next game', exact: true }).element() as HTMLAnchorElement).href).toBe('https://delos.sloprefinery.ai/');
+		expect(document.querySelector('a[href]')).toBeNull();
 	});
 	it('presentation evidence: physical rim overflow never gets an overfill-spoil glyph', async () => {
 		fillFixture = true;

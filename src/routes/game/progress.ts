@@ -144,3 +144,43 @@ export function rememberOnboarding(
 		// Learning still persists for this session when storage is blocked.
 	}
 }
+
+export interface Score {
+	drops: number;
+	at: number;
+}
+const SCORES = 'fluider-scores-v1';
+const MAX_SCORES = 10;
+
+/** Local-only high scores: dewdrops over a finished garden, best first, oldest first on ties. */
+export function loadScores(storage?: Storage | null): Score[] {
+	try {
+		const raw = JSON.parse(storageOrDefault(storage)?.getItem(SCORES) ?? '[]');
+		if (!Array.isArray(raw)) return [];
+		return raw
+			.filter(
+				(s): s is Score =>
+					Number.isInteger(s?.drops) &&
+					s.drops >= 0 &&
+					s.drops <= LEVELS.length * 3 &&
+					Number.isFinite(s?.at)
+			)
+			.map((s) => ({ drops: s.drops, at: s.at }))
+			.sort((a, b) => b.drops - a.drops || a.at - b.at)
+			.slice(0, MAX_SCORES);
+	} catch {
+		return [];
+	}
+}
+
+export function addScore(drops: number, at: number, storage?: Storage | null): Score[] {
+	const next = [...loadScores(storage), { drops, at }]
+		.sort((a, b) => b.drops - a.drops || a.at - b.at)
+		.slice(0, MAX_SCORES);
+	try {
+		storageOrDefault(storage)?.setItem(SCORES, JSON.stringify(next));
+	} catch {
+		/* The board stays correct in memory for this visit. */
+	}
+	return next;
+}

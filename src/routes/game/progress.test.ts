@@ -9,6 +9,8 @@ import {
 	unlocked,
 	loadOnboarding,
 	rememberOnboarding,
+	loadScores,
+	addScore,
 } from './progress.js';
 import type { Progress } from './types.js';
 
@@ -181,5 +183,26 @@ describe('unlock order', () => {
 		const storage = memory();
 		saveProgress(p, storage);
 		expect(loadProgress(storage).finale).toBe(true);
+	});
+});
+
+describe('local leaderboard', () => {
+	const max = LEVELS.length * 3;
+	it('ranks by dewdrops then age, keeps ten, and persists', () => {
+		const storage = memory();
+		for (let i = 0; i < 12; i++) addScore(i % max, 1000 + i, storage);
+		const board = loadScores(storage);
+		expect(board).toHaveLength(10);
+		expect(board.map((s) => s.drops)).toEqual([...board.map((s) => s.drops)].sort((a, b) => b - a));
+		expect(addScore(max, 5, storage)[0]).toEqual({ drops: max, at: 5 });
+	});
+	it('drops invalid entries and survives bad or blocked storage', () => {
+		const bad = memory();
+		bad.setItem('fluider-scores-v1', JSON.stringify([{ drops: 99, at: 1 }, { drops: 'x', at: 1 }, { drops: 3, at: 2 }]));
+		expect(loadScores(bad)).toEqual([{ drops: 3, at: 2 }]);
+		bad.setItem('fluider-scores-v1', '{');
+		expect(loadScores(bad)).toEqual([]);
+		expect(loadScores(null)).toEqual([]);
+		expect(addScore(4, 9, null)).toEqual([{ drops: 4, at: 9 }]);
 	});
 });
