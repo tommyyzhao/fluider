@@ -106,7 +106,7 @@
 	async function wander() { await audio?.resume(); select(0, true); }
 	function select(index: number, sandbox = false) {
 		if (!sandbox && (index < 0 || index >= levels.length || (!telemetry && index >= unlocked(progress) + 1))) return;
-		if (!roomHistory) { history.pushState({ ...history.state, verdigrisRoom: true }, ''); roomHistory = true; }
+		if (!roomHistory) { history.pushState({ ...history.state, fluiderRoom: true }, ''); roomHistory = true; }
 		stopRoom(screen === 'payoff' ? 'clear_exit' : 'next'); selected = index; screen = sandbox ? 'sandbox' : 'room'; session++; hint = roomHints.get(activeLevel.id) ?? 0; hintsOpen = hint > 0; error = ''; status = 'running'; readyToContinue = false; marks = undefined; revealed = 0; feedback = ''; resetArmed = false;
 		telemetry?.startRoom(sandbox ? SANDBOX : levels[index], sandbox, !sandbox && index >= unlocked(progress) + 1);
 		if (hintsOpen && hint) telemetry?.hint(hint);
@@ -201,7 +201,7 @@
 
 <svelte:head><title>Fluider</title><meta name="description" content="A sleeping machine-garden. A little water, a little patience. An intimate liquid puzzle game."/><meta name="theme-color" content="#0c2932"/></svelte:head>
 <svelte:window onkeydown={keyboard} onpopstate={() => { if (roomHistory) { roomHistory = false; map(); } }}/>
-<div class="verdigris" data-screen={screen}>
+<div class="fluider" data-screen={screen}>
 	<StudyPanel {levels} onrecorder={value => { telemetry = value; progress = { version: 2, cleared: {}, finale: false }; seen = {}; roomHints.clear(); }} onchoice={studyChoice} onpause={value => { studyPaused = value; if (value) runtime?.pause(); else { runtime?.resume(); paused = false; } }}/>
 
 	{#if screen === 'title'}
@@ -257,9 +257,9 @@
 </div>
 
 <style>
-	:global(body:has(.verdigris)) { overflow: hidden; }
-	:global(.verdigris button) { min-width: 44px; min-height: 44px; }
-	.verdigris { position: fixed; inset: 0; background: #0c2932; color: #d9dec3; font: 13px ui-sans-serif,system-ui,sans-serif; isolation: isolate; }
+	:global(body:has(.fluider)) { overflow: hidden; }
+	:global(.fluider button) { min-width: 44px; min-height: 44px; }
+	.fluider { position: fixed; inset: 0; background: #0c2932; color: #d9dec3; font: 13px ui-sans-serif,system-ui,sans-serif; isolation: isolate; }
 	.room-screen { position: absolute; inset: 0; background: radial-gradient(ellipse at 50% 38%,#294c44aa,transparent 65%),#0d2b32; display: flex; flex-direction: column; }
 	.room-header { display: flex; align-items: center; gap: 20px; padding: 24px 38px 18px; position: relative; z-index: 5; min-height: 52px; }.room-header.cleared { justify-content: center; }
 	.room-heading>span { color: #b5c4a6; font-size: 10px; text-transform: uppercase; letter-spacing: .18em; }.room-heading h1 { font: 400 22px/1.3 Georgia,serif; color: #e5e5c9; margin: 5px 0 0; }.pause-label,.bar-restart { display: none; }.room-actions { margin-left: auto; display: flex; align-items: center; gap: 15px; }

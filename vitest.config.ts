@@ -7,8 +7,8 @@ import { playwright } from '@vitest/browser-playwright';
 import { studyBuildHash } from './scripts/study-build-hash.mjs';
 
 // Bench evidence (screenshots, solver checkpoints, timing JSON) goes under one root.
-// Override with VERDIGRIS_BENCH_DIR; the default lives in the OS temp directory.
-const benchDir = resolve(process.env.VERDIGRIS_BENCH_DIR ?? join(tmpdir(), 'verdigris-bench'));
+// Override with FLUIDER_BENCH_DIR; the default lives in the OS temp directory.
+const benchDir = resolve(process.env.FLUIDER_BENCH_DIR ?? join(tmpdir(), 'fluider-bench'));
 
 const browserProject = defineProject({
 	extends: true,
@@ -95,7 +95,7 @@ const nodeProject = defineProject({
 export default defineConfig({
 	define: {
 		'import.meta.env.VITE_STUDY_BUILD_HASH': JSON.stringify(studyBuildHash(new URL('.', import.meta.url))),
-		'import.meta.env.VERDIGRIS_BENCH_DIR': JSON.stringify(benchDir)
+		'import.meta.env.FLUIDER_BENCH_DIR': JSON.stringify(benchDir)
 	},
 	cacheDir: '.svelte-kit/vitest-cache',
 	plugins: [sveltekit()],

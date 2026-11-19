@@ -66,7 +66,7 @@ describe('progress storage', () => {
 		};
 		expect(() => rememberOnboarding('pour', storage)).not.toThrow();
 	});
-	it('retains saved Verdigris progression after branding changes', () => {
+	it('retains saved Fluider progression after branding changes', () => {
 		const progress = { version: 2, cleared: { [LEVELS[0].id]: 2 }, finale: false };
 		expect(loadProgress(memory(JSON.stringify(progress)))).toEqual(progress);
 	});

@@ -3,7 +3,7 @@
   "configVersion": 1,
   "workspaces": {
     "": {
-      "name": "verdigris",
+      "name": "fluider",
       "dependencies": {
         "svelte-fluid": "^1.2.0",
       },

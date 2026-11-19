@@ -1,4 +1,4 @@
-const BENCH = import.meta.env.VERDIGRIS_BENCH_DIR;
+const BENCH = import.meta.env.FLUIDER_BENCH_DIR;
 import { describe, expect, it } from 'vitest';
 import { commands } from 'vitest/browser';
 import { LiquidEngine } from 'svelte-fluid/experimental';

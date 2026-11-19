@@ -1,5 +1,5 @@
 /*
- * Verdigris game contract: level data schema, player actions, view state and
+ * Fluider game contract: level data schema, player actions, view state and
  * events. The pure model (model.ts) turns actions + sensor frames into liquid
  * ticks; presentation and audio read `RoomView` and `GameEvent`s only.
  *

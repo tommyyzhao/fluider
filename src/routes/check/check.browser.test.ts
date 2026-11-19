@@ -1,4 +1,4 @@
-const BENCH = import.meta.env.VERDIGRIS_BENCH_DIR;
+const BENCH = import.meta.env.FLUIDER_BENCH_DIR;
 import { expect, it } from 'vitest';
 import { mount, tick, unmount } from 'svelte';
 import { commands, page } from 'vitest/browser';

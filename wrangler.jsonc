@@ -1,5 +1,5 @@
 // Cloudflare Pages: fluider.sloprefinery.ai uses a Namecheap CNAME to fluider.pages.dev.
-// The legacy verdigris Worker remains untouched; deploy with `wrangler pages deploy build`.
+// The legacy Worker remains untouched; deploy with `wrangler pages deploy build`.
 {
 	"name": "fluider",
 	"compatibility_date": "2026-10-01",

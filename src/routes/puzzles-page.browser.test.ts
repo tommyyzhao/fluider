@@ -1,4 +1,4 @@
-const BENCH = import.meta.env.VERDIGRIS_BENCH_DIR;
+const BENCH = import.meta.env.FLUIDER_BENCH_DIR;
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { mount, tick, unmount } from 'svelte';
 import { commands, page, userEvent } from 'vitest/browser';
@@ -383,7 +383,7 @@ afterEach(async () => {
 	vi.restoreAllMocks();
 });
 
-describe('Verdigris study recording', () => {
+describe('Fluider study recording', () => {
 	it('research break keeps resume controls reachable and resumes active clocks', async () => {
 		const original = location.href; history.replaceState(history.state, '', '?study=1');
 		try {
@@ -467,7 +467,7 @@ describe('Verdigris study recording', () => {
 	});
 });
 
-describe('Verdigris contextual gestures', () => {
+describe('Fluider contextual gestures', () => {
 	it('retains hint depth per room across close, restart and return; Back opens map', async () => {
 		await setup();
 		await page.getByRole('button', { name: 'Open next hint' }).click();

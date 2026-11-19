@@ -1,6 +1,7 @@
 import { LEVELS } from './levels.js';
 import type { Progress } from './types.js';
 
+// Storage keys keep their original prefix on purpose: renaming them would erase existing players' saves.
 const KEY = 'verdigris-progress-v2';
 const empty = (): Progress => ({ version: 2, cleared: {}, finale: false });
 

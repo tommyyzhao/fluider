@@ -156,7 +156,7 @@ function setup() {
 	};
 }
 
-describe('Verdigris fixed-step runtime', () => {
+describe('Fluider fixed-step runtime', () => {
 	it('waits for exact late, out-of-order sensors and wind; observes t before planning t+2', async () => {
 		vi.useFakeTimers();
 		const s = setup();
